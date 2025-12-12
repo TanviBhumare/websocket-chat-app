@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Chat App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .chat-container {
+            background-color: #fff;
+            width: 400px;
+            max-width: 100%;
+            height: 500px;
+            box-shadow: 0px 0px 20px rgba(0,0,0,0.2);
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            padding: 10px 0;
+            margin: 0;
+        }
+
+        #usernameSection, #chatSection {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+        }
+
+        #messages { 
+            flex: 1;
+            overflow-y: auto; 
+            padding: 10px; 
+            border-radius: 10px;
+            background-color: #f2f2f2;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 5px;
+        }
+
+        .message {
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 15px;
+            max-width: 70%;
+            word-wrap: break-word;
+            clear: both;
+        }
+
+        .self {
+            background-color: #c8a2f8; /* light purple */
+            align-self: flex-end;
+            text-align: right;
+            color: #fff;
+        }
+
+        .other {
+            background-color: #fff176; /* light yellow */
+            border: 1px solid #e0e0e0;
+            align-self: flex-start;
+            text-align: left;
+        }
+
+        #typingIndicator {
+            font-style: italic; 
+            color: gray; 
+            margin-bottom: 5px;
+        }
+
+        .input-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: auto; /* keep input at bottom */
+        }
+
+        #msgInput, #usernameInput {
+            flex: 1;
+            padding: 10px;
+            border-radius: 20px;
+            border: 1px solid #ccc;
+            outline: none;
+            margin-right: 5px;
+        }
+
+        button {
+            padding: 10px 15px;
+            cursor: pointer;
+            background-color: #6a1b9a; /* purple */
+            color: white;
+            border: none;
+            border-radius: 20px;
+        }
+
+        button:hover {
+            background-color: #4a148c;
+        }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+
+    <h2>WebSocket Chat</h2>
+
+    <!-- Username input -->
+    <div id="usernameSection">
+        <div style="flex:1;"></div> <!-- spacer pushes input to bottom -->
+        <div class="input-section">
+            <input id="usernameInput" placeholder="Enter your name" />
+            <button onclick="startChat()">Start Chat</button>
+        </div>
+    </div>
+
+    <!-- Chat area (hidden initially) -->
+    <div id="chatSection" style="display:none; flex:1; flex-direction: column;">
+        <div id="messages"></div>
+        <div id="typingIndicator"></div>
+        <div class="input-section">
+            <input id="msgInput" placeholder="Type message..." />
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+
+    const usernameSection = document.getElementById("usernameSection");
+    const chatSection = document.getElementById("chatSection");
+
+    const messagesDiv = document.getElementById("messages");
+    const input = document.getElementById("msgInput");
+    const typingDiv = document.getElementById("typingIndicator");
+    const usernameInput = document.getElementById("usernameInput");
+
+    let username = "";
+
+    function startChat() {
+        username = usernameInput.value.trim();
+        if (!username) username = "Anonymous";
+
+        usernameSection.style.display = "none";
+        chatSection.style.display = "flex";
+    }
+
+    // Typing indicator
+    input.addEventListener("input", () => {
+        socket.emit("typing", true);
+        clearTimeout(window.typingTimeout);
+        window.typingTimeout = setTimeout(() => {
+            socket.emit("typing", false);
+        }, 1000);
+    });
+
+    // Receive messages
+    socket.on("receiveMessage", (data) => {
+        const p = document.createElement("div");
+        p.classList.add("message");
+
+        if(data.user === username){
+            p.classList.add("self");
+        } else {
+            p.classList.add("other");
+        }
+
+        p.textContent = `${data.user}: ${data.message}`;
+        messagesDiv.appendChild(p);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    // Typing indicator
+    socket.on("userTyping", (status) => {
+        typingDiv.textContent = status ? "Someone is typing..." : "";
+    });
+
+    // Send message
+    function sendMessage() {
+        const msg = input.value;
+        if (!msg.trim()) return;
+        socket.emit("sendMessage", { user: username, message: msg });
+        socket.emit("typing", false);
+        input.value = "";
+    }
+</script>
+
+</body>
+</html>
